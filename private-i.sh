@@ -83,7 +83,7 @@ f_sudo_world() {
 }
 
 f_conf_world() {
-	perm_conf=$(find /etc -type f \( -perm -o+w \) -exec ls -adl {} \;)
+	perm_conf=$(find /etc -type f \( -perm -o+w \) -exec ls -adl {} \; 2> /dev/null)
 
 	     if [ -z "$perm_conf" ]; then
 		   echo "$no - Nothing in /etc/ is World Writable"
@@ -406,10 +406,11 @@ select opt in "${priv[@]}" "Exit"; do
 
 	   echo -e "${blu}-------------------${cyn}World-Writable Directories${blu}------------------------${noco}"
 	   echo -e "${cyn}PLEASE STAND BY ...${noco}"
-	   find / -xdev -type d \( -perm -0002 -a ! -perm -1000 \) -print
+	   find / -xdev -type d \( -perm -0002 -a ! -perm -1000 \) -print 2> /dev/null |grep -v vmware
 
 	   echo -e "${blu}---------------------${cyn}World-Writable Files${blu}----------------------------${noco}"
-	   find / -xdev -type f \( -perm -0002 -a ! -perm -1000 \) -print
+	   find / -xdev -type f \( -perm -0002 -a ! -perm -1000 \) -print 2> /dev/null |grep -v vmware
+
 	   
 	   echo -e "${blu}---------${cyn}Searching string 'password' in common areas${blu}-----------------${noco}"
 	   f_passwd_search

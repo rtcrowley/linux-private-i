@@ -12,10 +12,10 @@ low@victim:/# ./private-i.sh
 ----------------------------------------------------------------------
 --------------------------Linux Private-i-----------------------------
 ----------------------------------------------------------------------
-1) Full Scope		    - Non-Targeted approach with verbose results
-2) Quick Canvas		  - Brief System Investigation
-3) Sleuths Special	- Search for unique perms, sensitive files, passwords, etc
-4) Kernel Tip-off	  - Lists possible Kernel exploits
+1) Full Scope       - Non-Targeted approach with verbose results
+2) Quick Canvas     - Brief System Investigation
+3) Sleuths Special  - Search for unique perms, sensitive files, passwords, etc
+4) Kernel Tip-off   - Lists possible Kernel exploits
 5) Exit
 Selection: 
 ```

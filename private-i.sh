@@ -350,7 +350,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   df -h
 	   echo -e "${cyn}\nfstab${noco}"
 	   cat /etc/fstab |grep -v '#'	   
-	   
+	   echo -e "${blu}---------------------${cyn}Do Your Due Diligence${blu}----------------------------${noco}"
 	   exit;;
 
 	2) 
@@ -384,7 +384,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   f_log_world
 	   echo -e ${cyn}Quick App Research${noco}
 	   f_basic_apps
-
+	   echo -e "${blu}---------------------${cyn}Do Your Due Diligence${blu}----------------------------${noco}"
 	   exit;;
 
 	3) 
@@ -414,7 +414,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   
 	   echo -e "${blu}---------${cyn}Searching string 'password' in common areas${blu}-----------------${noco}"
 	   f_passwd_search
-	   
+	   echo -e "${blu}---------------------${cyn}Do Your Due Diligence${blu}----------------------------${noco}"
 	   exit;;
 
 	4)

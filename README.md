@@ -1,11 +1,9 @@
 # Linux Private-i
-A Linux Privilege Escalation script to automate the basic enumeration steps and display results in an easily readable format.
-
-Execute script on the local low privileged user and select option. It's best to have a bash shell, but this has been designed for portability.
+A Linux Privilege Escalation script to automate the basic enumeration steps and display results in an easily readable format. Using Bash, execute private-i.sh on the local low privileged user and select option. The script does not write or auto-exploit in any way.
 
 ___
 
-### Usage:
+### Private-i Usage:
 
 ```
 low@victim:/# ./private-i.sh
@@ -20,7 +18,13 @@ low@victim:/# ./private-i.sh
 Selection: 
 ```
 
-**Add any new Kernel Exploits in the kernel tip off array. Format however you'd like - just make sure the kernel version is listed.**
+Also included is the portable **noir** version. Although less verbose without option selection, it can be ran without a Bash shell.
+
+### Noir-Private-i Usage:
+
+```
+low@victim:/# ./noir-private-i.sh
+```
 
 ___
 
@@ -159,3 +163,8 @@ UUID=ca4abe47-c6d5-4e77-a46c-ca822fd15732 /               ext4    errors=remount
 UUID=248114c8-b7a0-4675-94f9-5183cd29d41d none            swap    sw              0       0
 /dev/sr0        /media/cdrom0   udf,iso9660 user,noauto     0       0
 ```
+
+
+**Add any new Kernel Exploits in the kernel tip off array. Format however you'd like - just make sure the kernel version is listed.**
+
+

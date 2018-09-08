@@ -785,7 +785,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   echo -e " '-${gray}|_____|${noco}-'                                                    $pi_version"
 	   echo "$brk"
 	   echo -e ${blu}--------------------------${cyn}Detecting R or W Logs${blu}-----------------------${noco}
-	   f_log_worl
+	   f_log_world
 	   echo -e ${blu}-------------------------------${cyn}Vital Checks${blu}---------------------------${noco}
 	   f_pass_world
 	   f_shadow_world

@@ -231,7 +231,7 @@ f_ssh_world(){
 
 
 f_passwd_search(){
-	passwd_search=("/var/www/" "/var/apache2/" "/var/log/" "/home/" "/opt")
+	passwd_search=("/var/www/" "/var/log/" "/home/" "/opt/")
     	  for i in "${passwd_search[@]}"; do
 	    iv=$(grep -iRl "password" "${i}" 2>/dev/null)
 	     if [ -z "$iv" ]; then
@@ -786,7 +786,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   echo "$brk"
 	   echo -e ${blu}--------------------------${cyn}Detecting R or W Logs${blu}-----------------------${noco}
 	   f_log_worl
-	   echo -e ${blu}-------------------------------${cyn}Vital Checks${blu}----------------------------${noco}
+	   echo -e ${blu}-------------------------------${cyn}Vital Checks${blu}---------------------------${noco}
 	   f_pass_world
 	   f_shadow_world
 	   f_sudo_world

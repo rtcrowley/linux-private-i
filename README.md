@@ -3,7 +3,7 @@ A Linux Enumeration & Privilege Escalation tool that automates the basic enumera
 
 Using Bash, execute private-i.sh on the local low privileged user.
 
-![alt text](https://rtcrowley.github.io/start.png?raw=true "execute")
+![alt text](https://rtcrowley.github.io/pi_main.png?raw=true "execute")
 
 Select an option, execute & watch the show. Each mode uses common Linux binaries to enumerate the local system (find, grep, ps, etc). If you have a non-bash shell such as **sh**, use [Noir-Private-i](#noir-private-i). **Either script will not write or auto-exploit in any way**.
 
@@ -35,7 +35,7 @@ ___
 
 Runs basic vital checks, then searches the filesystem for world-writable permissions & 'password' strings in common directories. Depending on the size of the filesystem, this option may take a while to complete. 
 
-![alt text](https://rtcrowley.github.io/pi_sspecial.png?raw=true "special")
+![alt text](https://rtcrowley.github.io/pi_slspec.png?raw=true "special")
 
 ## Kernel Tip-Off
 

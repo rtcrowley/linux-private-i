@@ -13,7 +13,7 @@ yel='\033[01;33m'
 
 brk=$(echo -e ${blu}"----------------------------------------------------------------------"${noco})
 
-pi_version=$(echo -e ${cyn}"v1.0"${noco})
+pi_version=$(echo -e ${cyn}"v1.1"${noco})
 
 title=$(
 	echo "$brk"
@@ -30,7 +30,25 @@ echo "$title"
 # Basic OS
 #==========
 
-f_os() { os=$(cat /etc/lsb-release |grep "DESCRIPTION" |cut -d '=' -f2 |tr -d '"'); echo "$os"; }
+f_os() { 
+	os_cent=$(cat /etc/centos-release 2</dev/null)
+	if [ -n "$os_cent" ]; then
+	  cat /etc/centos-release
+	else
+	  os_chk=$(ls /etc/*-release)
+	  case "$os_chk" in
+	    *redhat*)
+		cat /etc/redhat-release 2</dev/null
+		;;
+	    *lsb*)
+		cat /etc/lsb-release 2</dev/null |grep "DESCRIPTION" |cut -d '=' -f2 |tr -d '"' 2</dev/null
+		;;
+	    *os-rel*)
+		cat /etc/os-release 2</dev/null |grep PRETTY_NAME |cut -d '=' -f2 |tr -d '"' 2</dev/null
+		;;
+	    esac
+	fi
+}
 
 f_krel() { krel=$(uname -r); echo "$krel"; }
 
@@ -87,8 +105,12 @@ f_pass_world() {
 
 
 f_sudo_world() {
-	perm_sudoers=$(ls -la /etc/sudoers |cut -c 7-10)
-	case "$perm_sudoers" in
+	perm_sudoers=$(ls -la /etc/sudoers 2>/dev/null |cut -c 7-10)
+	# Update this for RHEL distros as sudoers file doesn't exist.	
+	if [ -z perm_sudoers ]; then
+		echo "$no - /etc/sudoers file does not exist"
+	else
+	  case "$perm_sudoers" in
 		rw*)
 		   echo "$yes - /etc/sudoers is World R & W"
 		   ;;
@@ -102,6 +124,7 @@ f_sudo_world() {
 		   echo "$no - /etc/sudoers is neither world readable nor writable"
 		   ;;
 	   	esac
+	fi
 }
 
 f_conf_world() {
@@ -117,7 +140,7 @@ f_conf_world() {
 }
 
 f_mail_world() {
-	perm_mail=$(ls -l /var/mail/ |cut -c 7-10)
+	perm_mail=$(ls -l /var/mail/ 2>/dev/null |cut -c 7-10)
 	case "$perm_mail" in
 		rw*)
 		   echo "$yes - Mail in /var/mail/ is World R & W"
@@ -245,6 +268,86 @@ f_passwd_search(){
 
 }
 
+f_cron(){
+	   cron_chk=$(cat /etc/crontab 2>/dev/null |grep -v '#')
+	   if [ -z "$cron_chk" ]; then
+		echo "/etc/crontab not found"; else
+		echo "$cron_chk"
+	   fi
+	  
+}
+
+f_group(){
+	   gp=$(groups)
+	   for i in "$gp";do
+		case "$i" in
+		  *root*)
+			echo "$yes $yes $yes - You're root...";;		  
+		  *sudo*)
+			echo "$yes - Great you have sudo privs";;
+		  *lxd*)
+			echo "$yes - Memebr of LXD. PrivEsc may be possible via LXD.";;
+		  *)
+			:;;
+		  esac
+	   done
+}	  
+
+
+##################
+#### Security ####
+##################
+
+# Check SELinux and AppArmor configs
+f_sec_built(){
+	se_chk=$(sestatus 2>/dev/null)
+	if [ -z "$se_chk" ];then
+  	aa_chk=$(aa-status 2>/dev/null |grep -v apparmor)
+		if [ -z "$aa_chk" ];then
+	  	echo "$yes - AppArmor nor SELinux are installed";else
+	  	for i in "$aa_chk";do
+			aain=$(echo "$i" |cut -d ' ' -f1 |tr -d '\r\n')
+			if [ "$aain" != '0000000' ];then
+			  echo "$no - AppArmor has Profiles/Procs configured. Good Luck"
+			  echo -e ${purp}"$aa_chk"${noco};else
+			  echo "$yes - AppArmor not configured. Zero Loaded or Enforced Profiles/Procs"
+			fi
+	 	 done
+		fi	  
+	else
+ 	 se_stat=$(echo "$se_chk" |grep status |rev |cut -d ' ' -f1 |rev |tr -d ' ')
+ 	 case "$se_stat" in
+		enabled)
+			echo "$no - SELinux is Enabled"
+			se_mode=$(echo "$se_chk" |grep mode |rev |cut -d ' ' -f1 |rev |tr -d ' ')
+			case "$se_mode" in
+			  permissive)
+			    echo "      $yes - SELinux Mode is only set to Permissive";;
+			  enforcing)
+			    echo "      $no - SELinux Mode is set to Enforcing. Good Luck";;
+			  disabled)
+			    echo "      $yes - SELinux Mode is set to Disabled";;
+			esac
+			;;
+		disabled)
+			echo "$yes - It seems SELinux is Disabled.";;
+		*)
+			echo "Unsure what the status is....";;
+		esac
+ 	fi
+}
+
+f_aslr(){
+	aslr_chk=$(cat /proc/sys/kernel/randomize_va_space 2>/dev/null)
+	if [ -z "$aslr_chk" ];then
+	  :
+	else
+	  if [ "$aslr_chk" == '0' ];then
+		echo "$yes - ASLR is Disabled";else
+		echo "$no - ASLR is Enabled"
+	  fi
+	fi
+}
 
 ##############
 #### Apps ####
@@ -323,8 +426,8 @@ f_tc_pass(){
 }
 
 f_smb(){
-	smb_ck=$(ls /etc |grep -wi samba)
-	if [ -z "$iv" ]; then
+	smb_ck=$(ls /etc |grep -wi samba 2>/dev/null)
+	if [ -z "$smb_ck" ]; then
 	  echo "$no - Unable to confirm if Samba is installed";else
 	  echo "$yes - Samba is installed"
 	  smb_v=$(samba -V 2>/dev/null)
@@ -359,7 +462,7 @@ f_adv_apps(){
 	tomcat=$(ls /etc/ |grep '\<tomcat.*\>' 2</dev/null)
 	#test this
 	apache=$(ls /etc/ |grep '\<apache.*\>' 2</dev/null)
-	adv_apps=("Apache" "HTTPD" "$tomcat" "Netcat" "Perl" "Ruby" "Python" "Netcat")
+	adv_apps=("Apache" "HTTPD" "Tomcat" "Netcat" "Perl" "Ruby" "Python" "Netcat")
     	  for i in "${adv_apps[@]}"; do
 	    iv=$(
 	    ls /bin |grep -wi "$i"
@@ -392,7 +495,7 @@ f_adv_apps(){
 
 			;;
 			tomcat*)
-				icat=$(ls -l /etc/tomcat*/tomcat*-users.xml |cut -c 7-10 2>/dev/null)
+				icat=$(ls -l /etc/tomcat*/tomcat*-users.xml 2>/dev/null |cut -c 7-10)
                           	case "$icat" in
                           	   rw*)
                              	   	echo "      $yes - tomcat-users.xml is World R and W"
@@ -426,7 +529,16 @@ f_co_pass(){
 	cx=$(find /etc/couchdb/local.ini -exec grep pbkdf2 {} \; 2>/dev/null)
 	IFS=$'\n'
 
-	if [ -z "$cx" ]; then echo "          $no Unable to find user or hashed password in local.ini";else
+	if [ -z "$cx" ]; then 
+	  cx2=$(find /opt/couchdb/etc/local.ini -exec grep pbkdf2 {} \; 2>/dev/null)
+	  if [ -z "$cx2" ]; then
+	  	echo "          $no Unable to find user or hashed password in local.ini";else
+	  	for f in $cx2;do
+   	     	  echo "          $yes Found user & hashed password in local.ini"
+	     	  echo -e ${yel}"              $f"
+	  	done
+	  fi
+ 	else
 	  for f in $cx;do
    	     echo "          $yes Found user & hashed password in local.ini"
 	     echo -e ${yel}"              $f"
@@ -462,7 +574,7 @@ f_mon_auth(){
 
 f_db_apps(){
 	sqlite_v=$(ls /usr/bin/ |grep '\<sqlite.*\>' 2</dev/null)
-	if [ -z "$sqlite_v" ];then echo "$no - Unable to confirm if "$i" is installed";else
+	if [ -z "$sqlite_v" ];then echo "$no - Unable to confirm if SQLite is installed";else
 		echo "$yes - SQLite version(s) are installed"
 		for i in $sqlite_v;do
 		   if [ "$i" = "sqlite" ];then
@@ -503,7 +615,7 @@ f_db_apps(){
 				   if [ -z $pver ];then echo "      $no - Unable to find PostgreSQL version";else
 				        echo "      $yes Postgres Version: $pver"
 				   fi
-				   igres=$(ls -l /etc/postgresql/*/*/pg_hba.conf |cut -c 7-10 2>/dev/null)
+				   igres=$(ls -l /etc/postgresql/*/*/pg_hba.conf 2>/dev/null |cut -c 7-10 2>/dev/null)
                           	   case "$igres" in
                           	   rw*)
                              	   	echo "      $yes Postgres pg_hba.conf is World R and W";;
@@ -515,21 +627,25 @@ f_db_apps(){
 			;;
 
 			MySQL)
-				   imy=$(ls -l /etc/mysql/my.cnf |cut -c 7-10 2>/dev/null)
-                         	   case "$imy" in
-                          	   rw*)
-                             	   	echo "      $yes /etc/mysql/my.cnf is World R and W";;
-                          	   *r*)
-                             		echo "      $yes /etc/mysql/my.cnf is World-Readable";;
-                          	   *w*)
-                             		echo "      $yes /etc/mysql/my.cnf is World-Writable";;
-                          	   *)
-                             		echo "      $no /etc/mysql/my.cnf is neither world readable nor writable";;
-                          	   esac
-				
+				   imy=$(ls -l /etc/mysql/my.cnf 2>/dev/null |cut -c 7-10 )
+				   if [ -z $imy ];then echo "      $no - Unable to find 'my.cnf' in Default location";else
+                         	     case "$imy" in
+                          	       rw*)
+                             	   	 echo "      $yes /etc/mysql/my.cnf is World R and W";;
+                          	       *r*)
+                             		 echo "      $yes /etc/mysql/my.cnf is World-Readable";;
+                          	       *w*)
+                             		 echo "      $yes /etc/mysql/my.cnf is World-Writable";;
+                          	       *)
+                             		 echo "      $no /etc/mysql/my.cnf is neither world readable nor writable";;
+                          	       esac
+				   fi
+
 				   echo -e ${cyn}"      Searching for other my.cnf file versions"${noco}
 				   fmy=$(find /home -name 'my.cnf' -exec ls -l {} \; 2>/dev/null)
 				   fmy2=$(find ~/ -name 'my.cnf' -exec ls -l {} \; 2>/dev/null)
+				   fmy3=$(find /etc -name 'my.cnf' -exec ls -l {} \; 2>/dev/null)
+
 				   if [ -z "$fmy" ];then echo "      $no Unable to find/read file 'my.cnf' in /home";else
 					   nmy=$(echo "$fmy" |rev |cut -d ' ' -f1 |rev)
 					   echo "      $yes Found my.cnf in /home"
@@ -555,28 +671,62 @@ f_db_apps(){
 						fi
 					   done
 				   fi
+
+				   if [ -z "$fmy3" ];then echo "      $no Unable to find/read file 'my.cnf' in /etc";else
+					   nmy3=$(echo "$fmy3" |rev |cut -d ' ' -f1 |rev)
+					   echo "      $yes Found my.cnf in /etc"
+					   for f in $nmy3;do
+					   	echo -e ${purp}"          $f"${noco}
+						fmy3_pa=$(find $f -exec grep password {} \; 2>/dev/null)
+						if [ -z $fmy3_pa ]; then echo "           $no Unable to find/read 'password' in above my.cnf file";else
+							echo "          $yes Found string 'password' in above my.cnf file"
+							echo -e ${yel}"              $fmy3_pa"
+						fi
+					   done
+				   fi				   
+
 			;;
 			
 			CouchDB)
 
-				   ico=$(ls -l /etc/couchdb/local.ini |cut -c 7-10 2>/dev/null)
-                         	   case "$ico" in
-                          	   rw*)
+				   ico=$(ls -l /etc/couchdb/local.ini 2>/dev/null |cut -c 7-10)
+				   if [ -z "$ico" ];then
+					ico2=$(ls -l /opt/couchdb/etc/local.ini 2>/dev/null |cut -c 7-10)
+					if [ -z "$ico2" ];then
+					  echo "$no Cannot find local.ini"
+					else
+				     	case "$ico2" in
+                          	     	 rw*)
+                             	   	    echo "      $yes /opt/couchdb/etc/local.ini is World R and W"
+					    f_co_pass;;
+                          	    	 *r*)
+                             		    echo "      $yes /opt/couchdb/etc/local.ini is World-Readable"
+					    f_co_pass;;
+                          	    	 *w*)
+                             		    echo "      $yes /opt/couchdb/etc/local.ini is World-Writable";;
+                          	    	 *)
+                             		    echo "      $no /opt/couchdb/etc/local.ini is neither world readable nor writable";;
+                          	   	  esac
+					fi
+                         	   else
+				     case "$ico" in
+                          	     rw*)
                              	   	echo "      $yes /etc/couchdb/local.ini is World R and W"
 					f_co_pass;;
-                          	   *r*)
+                          	     *r*)
                              		echo "      $yes /etc/couchdb/local.ini is World-Readable"
 					f_co_pass;;
-                          	   *w*)
+                          	     *w*)
                              		echo "      $yes /etc/couchdb/local.ini is World-Writable";;
-                          	   *)
+                          	     *)
                              		echo "      $no /etc/couchdb/local.ini is neither world readable nor writable";;
-                          	   esac
+                          	     esac
+				  fi
 			;;	
 
 			Redis)
 
-				   ire=$(ls -l /etc/redis/redis.conf |cut -c 7-10 2>/dev/null)
+				   ire=$(ls -l /etc/redis/redis.conf 2>/dev/null |cut -c 7-10)
                          	   case "$ire" in
                           	   rw*)
                              	   	echo "      $yes /etc/redis/redis.conf is World R and W"
@@ -647,14 +797,14 @@ f_mail_apps(){
 		   echo "$yes - "$i" is installed"
 		   case "$i" in
 			Exim)
-				exver=$(exim -bV |sed -n '1p' 2>/dev/null)
+				exver=$(exim -bV 2>/dev/null |sed -n '1p')
 				if [ -z "$exver" ];then echo "    $no Unable to confirm Exim version";else
 					echo "      $yes $exver"
 				fi
 			;;
 			
 			Postfix)
-				pover=$(postconf -d mail_version)
+				pover=$(postconf -d mail_version 2>/dev/null)
 				if [ -z "$pover" ];then echo "    $no Unable to confirm Postfix version";else
 					echo "      $yes $pover"
 				fi
@@ -677,7 +827,7 @@ f_mail_apps(){
 pea=$(echo -e "${cyn}Full Scope${noco}		- Non-Targeted approach with verbose results")
 peb=$(echo -e "${cyn}Quick Canvas${noco}		- Brief System Investigation")
 pec=$(echo -e "${cyn}Sleuths Special${noco}	- Search for unique perms, sensitive files, passwords, etc")  
-ped=$(echo -e "${cyn}Kernel Tip-off${noco}	- Lists possible Kernel exploits")
+ped=$(echo -e "${cyn}Exploit Tip-off${noco}	- Lists possible OS & Kernel exploits")
 
 priv=("$pea" "$peb" "$pec" "$ped")
 
@@ -710,6 +860,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   f_sudo_world
 	   f_mail_world
 	   f_conf_world
+	   f_group
 	   echo -e ${cyn}/var/log/ Detection${noco}
 	   f_log_world
 	   echo -e ${blu}-------------------------${cyn}Application Research${blu}--------------------------${noco}
@@ -729,13 +880,16 @@ select opt in "${priv[@]}" "Exit"; do
 	   f_nettul
 	   echo -e "${blu}-----------------------------${cyn}Misc.${blu}-----------------------------------${noco}"
 	   echo -e ${cyn}Bash history - tail${noco}
-	   tail ~/.bash_history
+	   tail ~/.bash_history 2>/dev/null
 	   echo -e "${blu}\n-----------------------------${cyn}Crontab${blu}-----------------------------------${noco}"
-	   cat /etc/crontab |grep -v '#'
+	   f_cron
 	   echo -e "${blu}\n---------------------------${cyn}Mount Info${blu}---------------------------------${noco}"
 	   df -h
 	   echo -e "${cyn}\nfstab${noco}"
-	   cat /etc/fstab |grep -v '#'	   
+	   cat /etc/fstab |grep -v '#'
+	   echo -e "${blu}\n-------------------------${cyn}System Security${blu}------------------------------${noco}"
+	   f_sec_built
+	   f_aslr
 	   echo -e "${blu}---------------------${cyn}Do Your Due Diligence${blu}----------------------------${noco}"
 	   exit;;
 
@@ -753,6 +907,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   f_krel
 	   whoami
 	   id
+	   f_group
 	   echo -e "${blu}-----------------------------${cyn}Networking${blu}-------------------------------${noco}"
 	   echo -e ${cyn}ifconfig${noco}
 	   f_ifconfig
@@ -762,6 +917,7 @@ select opt in "${priv[@]}" "Exit"; do
 	   f_nettul
 	   echo -e ${blu}-----------------${cyn}File, Directory and App Quick Checks${blu}------------------${noco}
 	   echo -e ${cyn}Vital checks${noco}
+	   f_sec_built
 	   f_pass_world
 	   f_shadow_world
 	   f_sudo_world
@@ -809,32 +965,37 @@ select opt in "${priv[@]}" "Exit"; do
 	   echo "$brk"
 	   echo -e "${gray}         ,--.${yel}!,"${noco}
 	   echo -e "${gray}       __/   ${yel}-*-"${noco}
-	   echo -e "${gray}     ,d08b.  ${yel}'|'${noco}    Running ${cyn}Kernel Tip-off${noco} "
+	   echo -e "${gray}     ,d08b.  ${yel}'|'${noco}    Running ${cyn}Exploit Tip-off${noco} "
 	   echo -e "${gray}     0088MM     "${noco}
 	   echo -e "${gray}     '9MMP'     						$pi_version"
 	   echo "$brk"
 	   
-	   kern=$(uname -r |cut -d '.' -f1-2) 
-	   sploits=(	   
-	   "PE -- Linux Kernel < 4.10 4.10.6 -- AF_PACKET CVE-2017-7308"
-	   "PE -- Linux Kernel 4.3.3 Ubuntu 14.04 15.10 -- overlayfs CVE-2015-8660"
-	   "PE -- Linux Kernel 2.6.22 < 3.9 -- Dirty Cow CVE-2016-5195"
-	   "PE -- Linux Kernel 2.4/5.3 CentOS RHEL 4.8/5.3 -- ldso_hwcap CVE-2017-1000370"
-	   "PE -- Linux Kernel 2.6 2.4 Ubuntu 8.10 -- sock_sendpage() CVE-2009-2692"
-	   "PE -- Linux Kernel 2.6 3.2 Ubuntu  -- mempodipper"
-	   "PE -- Linux Kernel 2.6 Debian 4.0 -- Ubuntu UDEV < 1.4.1"
-	   "PE -- Linux Kernel 3.13 3.16 3.19 Ubuntu 12.04 14.04 14.10 15.04 -- overlayfs CVE-2015-1328"
- 	   "PE -- Linux Kernel < 3.15.4 -- ptrace CVE-2014-4699"
-	   "PE -- Linux Kernel < = 2.6.37 2.6 RHEL / Ubuntu 10.04 -- Full-Nelson CVE-2010-3849"
-	   "PE -- Linux Kernel 2.6.0 < 2.6.36 2.6 RHEL -- compat CVE-2010-3081"
-	   "PE -- Linux Kernel 2.6.8 < 2.6.16 2.6 -- h00lyshit CVE-2006-3626"
-	   "PE -- Linux Kernel 2.44 < 2.4.37 & 2.6.15 < 2.6.13 2.4 2.6 -- pipe.c CVE-2009-3547"
-	   "PE -- Linux Kernel 2.6.0 < 2.6.36 2.6 Ubuntu 9.10 10.04 -- half-nelson CVE-2010-4073"
-	   "PE -- Linux Ubunutu 9.04 Debian 4.0-- pulseaudio CVE-2009-1894"
+
+	   kern=$(uname -r |cut -d '.' -f1-2)
+	   sploits=(  
+	   "-- Linux Kernel 4.15 4.16 4.17 4.18 4.19 Ubuntu -- idmap CVE-2018-18955"
+	   "-- Linux Kernel 4.4 4.8 Ubuntu -- UFO memory corruption CVE-2017-1000112"
+	   "-- Linux Kernel 2.6 3.10 4.14 -- Mutagen Astronomy CVE-2018-14634"
+	   "-- Linux Kernel 4.4 4.8 4.9 4.10 4.11 4.13 -- BFP Signed Extension CVE-2017-16995"
+	   "-- Linux Kernel < 4.10 4.10.6 -- AF_PACKET CVE-2017-7308"
+	   "-- Linux Kernel 4.3.3 Ubuntu 14.04 15.10 -- overlayfs CVE-2015-8660"
+	   "-- Linux Kernel 2.6.22 3.0 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8 3.9 -- Dirty Cow CVE-2016-5195"
+	   "-- Linux Kernel 2.4/5.3 CentOS RHEL 4.8/5.3 -- ldso_hwcap CVE-2017-1000370"
+	   "-- Linux Kernel 2.6 2.4 Ubuntu 8.10 -- sock_sendpage() CVE-2009-2692"
+	   "-- Linux Kernel 2.6 3.2 Ubuntu  -- mempodipper"
+	   "-- Linux Kernel 2.6 Debian 4.0 -- Ubuntu UDEV < 1.4.1"
+	   "-- Linux Kernel 3.13 3.16 3.19 Ubuntu 12.04 14.04 14.10 15.04 -- overlayfs CVE-2015-1328"
+ 	   "-- Linux Kernel < 3.15.4 -- ptrace CVE-2014-4699"
+	   "-- Linux Kernel < = 2.6.37 2.6 RHEL / Ubuntu 10.04 -- Full-Nelson CVE-2010-3849"
+	   "-- Linux Kernel 2.6.0 < 2.6.36 2.6 RHEL -- compat CVE-2010-3081"
+	   "-- Linux Kernel 2.6.8 < 2.6.16 2.6 -- h00lyshit CVE-2006-3626"
+	   "-- Linux Kernel 2.44 < 2.4.37 & 2.6.15 < 2.6.13 2.4 2.6 -- pipe.c CVE-2009-3547"
+	   "-- Linux Kernel 2.6.0 < 2.6.36 2.6 Ubuntu 9.10 10.04 -- half-nelson CVE-2010-4073"
+	   "-- Ubunutu 9.04 Debian 4.0 -- pulseaudio CVE-2009-1894"
+
    	   )
 
-	   echo -e "${blu}-----------------${cyn}Listing ${kern} Kernel Exploits${blu}-------------------------${noco}"
-	   echo -e "${blu}---------------------${cyn}Do Your Due Diligence${blu}----------------------------${noco}"
+	   echo -e "${blu}-------------------${cyn}Listing ${kern} Kernel Exploits${blu}------------------------${noco}"
 	   for i in "${sploits[@]}"; do
              if [[ "$i" != *"$kern"* ]]; then
 		:
@@ -842,8 +1003,95 @@ select opt in "${priv[@]}" "Exit"; do
 		echo "$i"
              fi
 	   done
-
+	   echo " "
 	   
+	   os_ver=$(f_os | tr '[:upper:]' '[:lower:]')
+	   case "$os_ver" in
+		*ubuntu*)
+
+			ub_sploits=(  
+				   "-- Ubuntu 16.04 & 16.10 -- NTFS-3G Mount Helper CVE-2017-0358"
+				   "-- Ubuntu 16.04 -- Exim < 4.82.2 CVE-2016-1531"
+				   "-- Ubuntu 14.04 16.04 16.10 -- Nginx logrotate CVE-2016-1247"
+			   	   )
+
+
+			echo -e "${blu}-----------------${cyn}Searching Common Ubuntu Exploits${blu}---------------------${noco}"
+			ub_rel=$(cat /etc/lsb-release 2>/dev/null |grep -i "release" |cut -d '=' -f2 |cut -d '.' -f1-2)
+			# Dirty Sock
+			dsock_chk=$(snap --version 2>/dev/null |sed -n '1p' |rev |cut -d ' ' -f1 |rev |tr -d ' ' |tr -d '.')
+			if [ -z "$dsock_chk" ];then
+			  :
+			else			
+			  if [ "$dsock_chk" -lt '2371' ];then
+			    echo "-- Snapd < 2.37 -- Dirty Sock CVE-2019-7304 ";else
+			    :
+			  fi
+			fi
+			# ntfs-3g
+			if [ -z "$ub_rel" ];then
+			  :
+			else
+			   for i in "${ub_sploits[@]}"; do
+			     if [[ "$i" != *"$ub_rel"* ]]; then
+				:
+			     else
+				echo "$i"
+			     fi
+			   done
+
+			fi
+
+			;;	
+	   	*debian*)
+			echo -e "${blu}------------------${cyn}Searching Common Debian Exploits${blu}--------------------${noco}"
+			deb_sploits=(			
+				"-- Debian 8 -- Exim < 4.82.2 CVE-2016-1531"
+				"-- Debian 7 & 8 -- NTFS-3G Mount Helper CVE-2017-0358"
+				"-- Debian 8 -- Nginx logrotate CVE-2016-1247"
+				)
+
+			deb_rel=$(cat /etc/os-release 2>/dev/null |grep -i "version_id" |cut -d '=' -f2 |tr -d '"')
+			if [ -z "$deb_rel" ];then
+			  :
+			else
+			   for i in "${deb_sploits[@]}"; do
+			     if [[ "$i" != *"$deb_rel"* ]]; then
+				:
+			     else
+				echo "$i"
+			     fi
+			   done
+
+			fi
+
+			;;
+		*centos*)
+			echo -e "${blu}---------------${cyn}Searching Common RHEL/CentOS Exploits${blu}------------------${noco}"
+			cen_sploits=(
+			"-- CentOS 6.7 6.8 6.9 6.10 7.0 7.1 7.2 7.3 7.4 -- DHCP RCE CVE-2018-1111"
+			"-- CentOS 7.1 -- raceabrt CVE-2015-5287"
+			"-- CentOS 6.0 6.5 7.1 -- roothelper CVE-2015-3245"
+			)
+
+			cen_rel=$(cat /etc/redhat-release |cut -d ' ' -f3)
+			if [ -z "$cen_rel" ];then
+			  :
+			else
+			   for i in "${cen_sploits[@]}"; do
+			     if [[ "$i" != *"$cen_rel"* ]]; then
+				:
+			     else
+				echo "$i"
+			     fi
+			   done
+			fi
+			;;
+		*)
+			echo -e "${blu}-------------${cyn}Distro not listed in script logic, sorry${blu}-----------------${noco}"
+			echo "$os_ver";;
+		esac
+	   echo -e "${blu}---------------------${cyn}Do Your Due Diligence${blu}----------------------------${noco}"
 	   exit;;
 
 
